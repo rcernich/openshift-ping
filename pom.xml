@@ -61,6 +61,8 @@
 
     <modules>
         <module>common</module>
+        <module>jgroups/3.4</module>
+        <module>jgroups/3.6</module>
         <module>dns</module>
         <module>kube</module>
         <module>activemq</module>
@@ -85,6 +87,18 @@
             <dependency>
                 <groupId>org.openshift.ping</groupId>
                 <artifactId>openshift-ping-kube</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.openshift.ping</groupId>
+                <artifactId>openshift-ping-v34</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.openshift.ping</groupId>
+                <artifactId>openshift-ping-v36</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

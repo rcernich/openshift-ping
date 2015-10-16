@@ -16,6 +16,7 @@
 
 package org.openshift.ping.common.server;
 
+
 /**
  * @author <a href="mailto:ales.justin@jboss.org">Ales Justin</a>
  */

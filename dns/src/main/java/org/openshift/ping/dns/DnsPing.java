@@ -28,7 +28,6 @@ import java.util.Set;
 import org.jgroups.annotations.MBean;
 import org.jgroups.annotations.Property;
 import org.jgroups.conf.ClassConfigurator;
-import org.jgroups.protocols.PingData;
 import org.openshift.ping.common.OpenshiftPing;
 
 @MBean(description = "DNS based discovery protocol")
@@ -41,7 +40,9 @@ public class DnsPing extends OpenshiftPing {
     }
 
     @Property
-    private String serviceName; // DO NOT HARDCODE A DEFAULT (i.e.: "ping") - SEE isClusteringEnabled() and init() METHODS BELOW!
+    private String serviceName; // DO NOT HARDCODE A DEFAULT (i.e.: "ping") -
+                                // SEE isClusteringEnabled() and init() METHODS
+                                // BELOW!
     private String _serviceName;
 
     @Property
@@ -117,38 +118,16 @@ public class DnsPing extends OpenshiftPing {
     }
 
     @Override
-    protected synchronized List<PingData> doReadAll(String clusterName) {
+    protected synchronized List<OpenShiftNode> doReadAll(String clusterName) {
         Set<String> serviceHosts = getServiceHosts();
         if (log.isDebugEnabled()) {
             log.debug(String.format("Reading service hosts %s on port [%s]", serviceHosts, _servicePort));
         }
-        List<PingData> retval = new ArrayList<>();
-        boolean localAddrPresent = false;
+        List<OpenShiftNode> retval = new ArrayList<OpenShiftNode>();
         for (String serviceHost : serviceHosts) {
-            try {
-                PingData pingData = getPingData(serviceHost, _servicePort, clusterName);
-                localAddrPresent = localAddrPresent || pingData.getAddress().equals(local_addr);
-                retval.add(pingData);
-            } catch (Exception e) {
-                if (log.isInfoEnabled()) {
-                    log.info(String.format("PingData not available for cluster [%s], service [%s], host [%s], port [%s]; encountered [%s: %s]",
-                            clusterName, _serviceName, serviceHost, _servicePort, e.getClass().getName(), e.getMessage()));
-                }
-            }
+            retval.add(new OpenShiftNode(serviceHost, _servicePort));
         }
-        if (localAddrPresent) {
-            if (log.isDebugEnabled()) {
-                for (PingData pingData: retval) {
-                    log.debug(String.format("Returning PingData [%s]", pingData));
-                }
-            }
-            return retval;
-        } else {
-            if (log.isDebugEnabled()) {
-                log.debug("Local address not discovered, returning empty list");
-            }
-            return Collections.<PingData>emptyList();
-        }
+        return retval;
     }
 
 }

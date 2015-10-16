@@ -29,7 +29,6 @@ import java.util.Map;
 import org.jgroups.annotations.MBean;
 import org.jgroups.annotations.Property;
 import org.jgroups.conf.ClassConfigurator;
-import org.jgroups.protocols.PingData;
 import org.openshift.ping.common.OpenshiftPing;
 import org.openshift.ping.common.stream.CertificateStreamProvider;
 import org.openshift.ping.common.stream.InsecureStreamProvider;
@@ -192,7 +191,7 @@ public class KubePing extends OpenshiftPing {
     }
 
     @Override
-    protected synchronized List<PingData> doReadAll(String clusterName) {
+    protected synchronized List<OpenShiftNode> doReadAll(String clusterName) {
         Client client = getClient();
         List<Pod> pods;
         try {
@@ -204,8 +203,7 @@ public class KubePing extends OpenshiftPing {
             }
             pods = Collections.<Pod>emptyList();
         }
-        List<PingData> retval = new ArrayList<>();
-        boolean localAddrPresent = false;
+        List<OpenShiftNode> retval = new ArrayList<OpenShiftNode>();
         for (Pod pod : pods) {
             List<Container> containers = pod.getContainers();
             for (Container container : containers) {
@@ -213,32 +211,11 @@ public class KubePing extends OpenshiftPing {
                 if (client.accept(context)) {
                     String podIP = pod.getPodIP();
                     int containerPort = container.getPort(_pingPortName).getContainerPort();
-                    try {
-                        PingData pingData = getPingData(podIP, containerPort, clusterName);
-                        localAddrPresent = localAddrPresent || pingData.getAddress().equals(local_addr);
-                        retval.add(pingData);
-                    } catch (Exception e) {
-                        if (log.isInfoEnabled()) {
-                            log.info(String.format("PingData not available for cluster [%s], podIP [%s], containerPort [%s]; encountered [%s: %s]",
-                                    clusterName, podIP, containerPort, e.getClass().getName(), e.getMessage()));
-                        }
-                    }
+                    retval.add(new OpenShiftNode(podIP, containerPort));
                 }
             }
         }
-        if (localAddrPresent) {
-            if (log.isDebugEnabled()) {
-                for (PingData pingData: retval) {
-                    log.debug(String.format("Returning PingData [%s]", pingData));
-                }
-            }
             return retval;
-        } else {
-            if (log.isDebugEnabled()) {
-                log.debug("Local address not discovered, returning empty list");
-            }
-            return Collections.<PingData>emptyList();
-        }
     }
 
 }

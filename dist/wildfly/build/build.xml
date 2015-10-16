@@ -50,6 +50,7 @@
             <maven-resource group="org.openshift.ping" artifact="openshift-ping-common"/>
             <maven-resource group="org.openshift.ping" artifact="openshift-ping-dns"/>
             <maven-resource group="org.openshift.ping" artifact="openshift-ping-kube"/>
+            <maven-resource group="org.openshift.ping" artifact="openshift-ping-v34"/>
         </module-def>
 
         <module-def name="net.oauth.core">

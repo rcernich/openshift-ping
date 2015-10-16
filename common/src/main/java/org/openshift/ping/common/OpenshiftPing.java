@@ -17,25 +17,16 @@
 package org.openshift.ping.common;
 
 import static org.openshift.ping.common.Utils.getSystemEnvInt;
-import static org.openshift.ping.common.Utils.openStream;
 import static org.openshift.ping.common.Utils.trimToNull;
 
-import java.io.DataInputStream;
-import java.io.InputStream;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
-import org.jgroups.Address;
+import org.jgroups.Event;
 import org.jgroups.annotations.Property;
-import org.jgroups.protocols.FILE_PING;
 import org.jgroups.protocols.PingData;
-import org.openshift.ping.common.server.AbstractServer;
-import org.openshift.ping.common.server.Server;
-import org.openshift.ping.common.server.ServerFactory;
-import org.openshift.ping.common.server.Servers;
+import org.jgroups.stack.Protocol;
 
-public abstract class OpenshiftPing extends FILE_PING {
+public abstract class OpenshiftPing extends Protocol {
 
     private final String _systemEnvPrefix;
 
@@ -54,10 +45,6 @@ public abstract class OpenshiftPing extends FILE_PING {
     @Property
     private long operationSleep = 1000;
     private long _operationSleep;
-
-    private ServerFactory _serverFactory;
-    private Server _server;
-    private String _serverName;
 
     public OpenshiftPing(String systemEnvPrefix) {
         super();
@@ -92,21 +79,13 @@ public abstract class OpenshiftPing extends FILE_PING {
         return _operationSleep;
     }
 
-    protected abstract boolean isClusteringEnabled();
-
-    protected abstract int getServerPort();
-
-    public final void setServerFactory(ServerFactory serverFactory) {
-        _serverFactory = serverFactory;
-    }
-
     @Override
     public void init() throws Exception {
         super.init();
         _connectTimeout = getSystemEnvInt(getSystemEnvName("CONNECT_TIMEOUT"), connectTimeout);
         _readTimeout = getSystemEnvInt(getSystemEnvName("READ_TIMEOUT"), readTimeout);
         _operationAttempts = getSystemEnvInt(getSystemEnvName("OPERATION_ATTEMPTS"), operationAttempts);
-        _operationSleep = (long)getSystemEnvInt(getSystemEnvName("OPERATION_SLEEP"), (int)operationSleep);
+        _operationSleep = (long) getSystemEnvInt(getSystemEnvName("OPERATION_SLEEP"), (int) operationSleep);
     }
 
     @Override
@@ -119,81 +98,175 @@ public abstract class OpenshiftPing extends FILE_PING {
     }
 
     @Override
-    public void start() throws Exception {
-        if (isClusteringEnabled()) {
-            int serverPort = getServerPort();
-            if (_serverFactory != null) {
-                _server = _serverFactory.getServer(serverPort);
-            } else {
-                _server = Servers.getServer(serverPort);
+    public Object down(Event evt) {
+        if (evt instanceof InternalPingEvent) {
+            switch (evt.getType()) {
+            case InternalPingEvent.CONFIGURE:
+                return new OpenShiftPingConfig(isClusteringEnabled(), getServerPort(), getConnectTimeout(),
+                        getReadTimeout(), getOperationAttempts(), getOperationSleep());
+            case InternalPingEvent.COLLECT_MEMBERS:
+                return doReadAll((String) evt.getArg());
             }
-            _serverName = _server.getClass().getSimpleName();
-            if (log.isInfoEnabled()) {
-                log.info(String.format("Starting %s on port %s for channel address: %s", _serverName, serverPort, stack.getChannel().getAddress()));
-            }
-            boolean started = _server.start(stack.getChannel());
-            if (log.isInfoEnabled()) {
-                log.info(String.format("%s %s.", _serverName, started ? "started" : "reused (pre-existing)"));
-            }
+            return null;
+        }
+        return super.down(evt);
+    }
+
+    protected abstract boolean isClusteringEnabled();
+
+    protected abstract int getServerPort();
+
+    protected abstract List<OpenShiftNode> doReadAll(String clusterName);
+
+    /**
+     * Interface for pingers. This is intended to mixed in with a Discovery
+     * protocol that requests PingData from a list of servers. Ping and
+     * discovery are intended to be implemented by a separate protocol
+     * facilitated by passing messages up and down the protocol stack. This is
+     * to work around incompatibilities in the Discover class between JGroups
+     * versions.
+     */
+    public interface OpenShiftPingDataFactory {
+
+        public PingData createPingData();
+
+    }
+
+    public static final class InternalPingEvent extends Event {
+
+        /*
+         * return List<OpenShiftNode>; arg = String(clusterName)
+         */
+        public static final int COLLECT_MEMBERS = Event.USER_DEFINED + 1111;
+        /*
+         * return OpenShiftPingConfig; arg = null
+         */
+        public static final int CONFIGURE = COLLECT_MEMBERS + 1;
+
+        /**
+         * Create a new PingEvent.
+         * 
+         * @param type type of event
+         * @param arg protocol should act upon
+         */
+        public InternalPingEvent(int type, Object arg) {
+            super(type, arg);
         }
     }
 
-    @Override
-    public void stop() {
-        try {
-            if (_server != null) {
-                if (log.isInfoEnabled()) {
-                    log.info(String.format("Stopping server: %s", _serverName));
-                }
-                boolean stopped = _server.stop(stack.getChannel());
-                if (log.isInfoEnabled()) {
-                    log.info(String.format("%s %s.", _serverName, stopped ? "stopped" : "not stopped (still in use)"));
-                }
-            }
-        } finally {
-            super.stop();
+    /**
+     * Represents a node in cluster running on OpenShift.
+     */
+    public static final class OpenShiftNode {
+
+        private final String host;
+        private final int port;
+
+        public OpenShiftNode(String host, int port) {
+            this.host = host;
+            this.port = port;
+        }
+
+        /**
+         * Get the host.
+         * 
+         * @return the host.
+         */
+        public String getHost() {
+            return host;
+        }
+
+        /**
+         * Get the port.
+         * 
+         * @return the port.
+         */
+        public int getPort() {
+            return port;
         }
     }
 
-    @Override
-    protected final List<PingData> readAll(String clusterName) {
-        if (isClusteringEnabled()) {
-            return doReadAll(clusterName);
-        } else {
-            PingData pingData = AbstractServer.createPingData(stack.getChannel());
-            return Collections.<PingData>singletonList(pingData);
+    public static final class OpenShiftPingConfig {
+        private final boolean clusteringEnabled;
+        private final int serverPort;
+        private final int connectTimeout;
+        private final int readTimeout;
+        private final int operationAttempts;
+        private final long operationSleep;
+
+        /**
+         * Create a new OpenShiftPingConfig.
+         * 
+         * @param clusteringEnabled
+         * @param serverPort
+         * @param connectTimeout
+         * @param readTimeout
+         * @param operationAttempts
+         * @param operationSleep
+         */
+        public OpenShiftPingConfig(boolean clusteringEnabled, int serverPort, int connectTimeout, int readTimeout,
+                int operationAttempts, long operationSleep) {
+            super();
+            this.clusteringEnabled = clusteringEnabled;
+            this.serverPort = serverPort;
+            this.connectTimeout = connectTimeout;
+            this.readTimeout = readTimeout;
+            this.operationAttempts = operationAttempts;
+            this.operationSleep = operationSleep;
+        }
+
+        /**
+         * Get the clusteringEnabled.
+         * 
+         * @return the clusteringEnabled.
+         */
+        public boolean isClusteringEnabled() {
+            return clusteringEnabled;
+        }
+
+        /**
+         * Get the serverPort.
+         * 
+         * @return the serverPort.
+         */
+        public int getServerPort() {
+            return serverPort;
+        }
+
+        /**
+         * Get the connectTimeout.
+         * 
+         * @return the connectTimeout.
+         */
+        public int getConnectTimeout() {
+            return connectTimeout;
+        }
+
+        /**
+         * Get the readTimeout.
+         * 
+         * @return the readTimeout.
+         */
+        public int getReadTimeout() {
+            return readTimeout;
+        }
+
+        /**
+         * Get the operationAttempts.
+         * 
+         * @return the operationAttempts.
+         */
+        public int getOperationAttempts() {
+            return operationAttempts;
+        }
+
+        /**
+         * Get the operationSleep.
+         * 
+         * @return the operationSleep.
+         */
+        public long getOperationSleep() {
+            return operationSleep;
         }
     }
-
-    protected abstract List<PingData> doReadAll(String clusterName);
-
-    protected final PingData getPingData(String targetHost, int targetPort, String clusterName) throws Exception {
-        String pingUrl = String.format("http://%s:%s", targetHost, targetPort);
-        PingData pingData = new PingData();
-        Map<String, String> pingHeaders = Collections.singletonMap(Server.CLUSTER_NAME, clusterName);
-        try (InputStream pingStream = openStream(pingUrl, pingHeaders, _connectTimeout, _readTimeout, _operationAttempts, _operationSleep)) {
-            pingData.readFrom(new DataInputStream(pingStream));
-        }
-        return pingData;
-    }
-
-    @Override
-    protected final void createRootDir() {
-        // empty on purpose to prevent dir from being created in the local file system
-    }
-
-    @Override
-    protected final void writeToFile(PingData data, String clustername) {
-        // prevent writing to file in jgroups 3.2.x
-    }
-
-    protected final void write(List<PingData> list, String clustername) {
-        // prevent writing to file in jgroups 3.6.x
-    }
-
-    @Override
-    protected final void remove(String clustername, Address addr) {
-        // empty on purpose
-    }
-
 }

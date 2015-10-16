@@ -14,19 +14,21 @@
  *  permissions and limitations under the License.
  */
 
-package org.openshift.ping.kube.test;
+package org.openshift.ping.test;
 
 import java.io.DataInputStream;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.jgroups.conf.ClassConfigurator;
 import org.jgroups.protocols.PingData;
+import org.jgroups.protocols.openshift.PING36;
 import org.jgroups.stack.Protocol;
 import org.junit.Assert;
 import org.junit.Test;
-import org.openshift.ping.common.server.AbstractServer;
 import org.openshift.ping.common.server.Server;
 import org.openshift.ping.kube.Client;
 import org.openshift.ping.kube.KubePing;
@@ -35,22 +37,30 @@ import org.openshift.ping.kube.KubePing;
  * @author <a href="mailto:ales.justin@jboss.org">Ales Justin</a>
  */
 public abstract class ServerTestBase extends TestBase {
+    
+    private PING36 pinger;
+
     @Override
     protected int getNum() {
         return 1;
     }
 
-    protected Protocol createPing() {
-        KubePing ping = new TestKubePing();
+    protected List<Protocol> createPing() {
+        final KubePing ping = new TestKubePing();
         ping.setMasterProtocol("http");
         ping.setMasterHost("localhost");
         ping.setMasterPort(8080);
         ping.setNamespace("default");
-        applyConfig(ping);
-        return ping;
+        pinger = new PING36();
+        applyConfig(pinger);
+        List<Protocol> prots = new ArrayList<Protocol>() {{
+           add(ping);
+           add(pinger);
+        }};
+        return prots;
     }
 
-    protected abstract void applyConfig(KubePing ping);
+    protected abstract void applyConfig(PING36 ping);
 
     @Test
     public void testResponse() throws Exception {
@@ -60,7 +70,7 @@ public abstract class ServerTestBase extends TestBase {
         InputStream stream = conn.getInputStream();
         PingData data = new PingData();
         data.readFrom(new DataInputStream(stream));
-        Assert.assertEquals(data, AbstractServer.createPingData(channels[0]));
+        Assert.assertEquals(pinger.createPingData(), data);
     }
 
     private static final class TestKubePing extends KubePing {

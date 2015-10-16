@@ -17,17 +17,13 @@
 package org.openshift.ping.common.server;
 
 import java.lang.reflect.Field;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.jgroups.Address;
 import org.jgroups.Channel;
-import org.jgroups.Event;
 import org.jgroups.JChannel;
-import org.jgroups.PhysicalAddress;
-import org.jgroups.View;
 import org.jgroups.protocols.PingData;
+import org.openshift.ping.common.OpenshiftPing.OpenShiftPingDataFactory;
 
 /**
  * @author <a href="mailto:ales.justin@jboss.org">Ales Justin</a>
@@ -70,7 +66,7 @@ public abstract class AbstractServer implements Server {
 
     protected final boolean hasChannels() {
         synchronized (CHANNELS) {
-            return CHANNELS.isEmpty();
+            return !CHANNELS.isEmpty();
         }
     }
 
@@ -95,12 +91,8 @@ public abstract class AbstractServer implements Server {
      * @param channel the channel
      * @return ping data
      */
-    public static final PingData createPingData(Channel channel) {
-        Address address = channel.getAddress();
-        View view = channel.getView();
-        boolean is_server = false;
-        String logical_name = channel.getName();
-        PhysicalAddress paddr = (PhysicalAddress)channel.down(new Event(Event.GET_PHYSICAL_ADDRESS, address));
-        return new PingData(address, view, is_server, logical_name, Collections.singleton(paddr));
+    protected final PingData createPingData(Channel channel) {
+        OpenShiftPingDataFactory pinger = (OpenShiftPingDataFactory) channel.getProtocolStack().findProtocol(OpenShiftPingDataFactory.class);
+        return pinger.createPingData();
     }
 }

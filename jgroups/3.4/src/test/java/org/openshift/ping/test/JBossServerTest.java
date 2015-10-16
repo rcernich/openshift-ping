@@ -14,16 +14,16 @@
  *  permissions and limitations under the License.
  */
 
-package org.openshift.ping.kube.test;
+package org.openshift.ping.test;
 
-import org.openshift.ping.common.server.UndertowServerFactory;
-import org.openshift.ping.kube.KubePing;
+import org.jgroups.protocols.openshift.PING34;
+import org.openshift.ping.common.server.JBossServerFactory;
 
 /**
  * @author <a href="mailto:ales.justin@jboss.org">Ales Justin</a>
  */
-public class UndertowServerTest extends ServerTestBase {
-    protected void applyConfig(KubePing ping) {
-        ping.setServerFactory(new UndertowServerFactory());
+public class JBossServerTest extends ServerTestBase {
+    protected void applyConfig(PING34 ping) {
+        ping.setServerFactory(new JBossServerFactory());
     }
 }

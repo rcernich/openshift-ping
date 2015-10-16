@@ -14,7 +14,7 @@
  *  permissions and limitations under the License.
  */
 
-package org.openshift.ping.kube.test;
+package org.openshift.ping.test;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -63,16 +63,17 @@ public abstract class TestBase {
         receivers = new MyReceiver[getNum()];
 
         for (int i = 0; i < getNum(); i++) {
-            Protocol ping = createPing();
+            final List<Protocol> ping = createPing();
 
-            channels[i] = new JChannel(
-                new TCP().setValue("bind_addr", InetAddress.getLoopbackAddress()),
-                ping,
-                new NAKACK2(),
-                new UNICAST2(),
-                new STABLE(),
-                new GMS()
-            );
+            List<Protocol> stack = new ArrayList<Protocol>() {{
+                add(new TCP().setValue("bind_addr", InetAddress.getLoopbackAddress()));
+                addAll(ping);
+                add(new NAKACK2());
+                add(new UNICAST2());
+                add(new STABLE());
+                add(new GMS());
+            }};
+            channels[i] = new JChannel(stack);
             channels[i].setName(Character.toString((char) ('A' + i)));
             channels[i].connect(CLUSTER_NAME);
             channels[i].setReceiver(receivers[i] = new MyReceiver());
@@ -82,12 +83,12 @@ public abstract class TestBase {
     @After
     public void tearDown() throws Exception {
         for (JChannel channel: channels) {
-            channel.disconnect();
+            Util.shutdown(channel);
         }
         Util.close(channels);
     }
 
-    protected abstract Protocol createPing();
+    protected abstract List<Protocol> createPing();
 
     protected void clearReceivers() {
         for (MyReceiver r : receivers) r.getList().clear();

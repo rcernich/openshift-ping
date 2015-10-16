@@ -14,24 +14,16 @@
  *  permissions and limitations under the License.
  */
 
-package org.openshift.ping.common.server;
+package org.openshift.ping.test;
 
+import org.jgroups.protocols.openshift.PING36;
+import org.openshift.ping.common.server.JDKServerFactory;
 
 /**
  * @author <a href="mailto:ales.justin@jboss.org">Ales Justin</a>
  */
-public class UndertowServerFactory extends AbstractServerFactory {
-
-    public boolean isAvailable() {
-        try {
-            return UndertowServerFactory.class.getClassLoader().loadClass("io.undertow.Undertow") != null;
-        } catch (Exception e) {
-            return false;
-        }
+public class JDKServerTest extends ServerTestBase {
+    protected void applyConfig(PING36 ping) {
+        ping.setServerFactory(new JDKServerFactory());
     }
-
-    public Server createServer(int port) {
-        return new UndertowServer(port);
-    }
-
 }

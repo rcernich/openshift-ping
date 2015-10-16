@@ -14,24 +14,24 @@
  *  permissions and limitations under the License.
  */
 
-package org.openshift.ping.common.server;
+package org.openshift.ping.test;
 
+import java.util.Collections;
+import java.util.List;
+
+import org.jgroups.protocols.FILE_PING;
+import org.jgroups.stack.Protocol;
 
 /**
+ * A parallel test to ZK tests.
+ * Just so we know tests are fine.
+ *
  * @author <a href="mailto:ales.justin@jboss.org">Ales Justin</a>
  */
-public class UndertowServerFactory extends AbstractServerFactory {
+public class SimplePingTest extends PingTestBase {
 
-    public boolean isAvailable() {
-        try {
-            return UndertowServerFactory.class.getClassLoader().loadClass("io.undertow.Undertow") != null;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    public Server createServer(int port) {
-        return new UndertowServer(port);
+    protected List<Protocol> createPing() {
+        return Collections.<Protocol>singletonList(new FILE_PING());
     }
 
 }

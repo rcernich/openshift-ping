@@ -14,7 +14,7 @@
  *  permissions and limitations under the License.
  */
 
-package org.openshift.ping.kube.test;
+package org.openshift.ping.test;
 
 import static org.openshift.ping.common.Utils.readFileToString;
 
