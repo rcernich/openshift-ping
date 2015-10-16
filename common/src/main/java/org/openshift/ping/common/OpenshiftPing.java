@@ -27,10 +27,12 @@ import java.util.List;
 import java.util.Map;
 
 import org.jgroups.Address;
+import org.jgroups.Event;
+import org.jgroups.PhysicalAddress;
 import org.jgroups.annotations.Property;
 import org.jgroups.protocols.FILE_PING;
 import org.jgroups.protocols.PingData;
-import org.openshift.ping.common.server.AbstractServer;
+import org.jgroups.util.UUID;
 import org.openshift.ping.common.server.Server;
 import org.openshift.ping.common.server.ServerFactory;
 import org.openshift.ping.common.server.Servers;
@@ -160,7 +162,7 @@ public abstract class OpenshiftPing extends FILE_PING {
         if (isClusteringEnabled()) {
             return doReadAll(clusterName);
         } else {
-            PingData pingData = AbstractServer.createPingData(stack.getChannel());
+            PingData pingData = createPingData();
             return Collections.<PingData>singletonList(pingData);
         }
     }
@@ -196,4 +198,8 @@ public abstract class OpenshiftPing extends FILE_PING {
         // empty on purpose
     }
 
+    public PingData createPingData() {
+        PhysicalAddress paddr = (PhysicalAddress)down(new Event(Event.GET_PHYSICAL_ADDRESS, local_addr));
+        return new PingData(local_addr, view, is_server, UUID.get(local_addr), Collections.singleton(paddr));
+    }
 }

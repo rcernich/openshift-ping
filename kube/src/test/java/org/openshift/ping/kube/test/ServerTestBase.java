@@ -26,7 +26,7 @@ import org.jgroups.protocols.PingData;
 import org.jgroups.stack.Protocol;
 import org.junit.Assert;
 import org.junit.Test;
-import org.openshift.ping.common.server.AbstractServer;
+import org.openshift.ping.common.OpenshiftPing;
 import org.openshift.ping.common.server.Server;
 import org.openshift.ping.kube.Client;
 import org.openshift.ping.kube.KubePing;
@@ -35,6 +35,9 @@ import org.openshift.ping.kube.KubePing;
  * @author <a href="mailto:ales.justin@jboss.org">Ales Justin</a>
  */
 public abstract class ServerTestBase extends TestBase {
+    
+    private OpenshiftPing pinger;
+
     @Override
     protected int getNum() {
         return 1;
@@ -47,6 +50,7 @@ public abstract class ServerTestBase extends TestBase {
         ping.setMasterPort(8080);
         ping.setNamespace("default");
         applyConfig(ping);
+        pinger = ping;
         return ping;
     }
 
@@ -60,7 +64,7 @@ public abstract class ServerTestBase extends TestBase {
         InputStream stream = conn.getInputStream();
         PingData data = new PingData();
         data.readFrom(new DataInputStream(stream));
-        Assert.assertEquals(data, AbstractServer.createPingData(channels[0]));
+        Assert.assertEquals(pinger.createPingData(), data);
     }
 
     private static final class TestKubePing extends KubePing {
